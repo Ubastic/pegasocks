@@ -55,18 +55,26 @@ execute_process(
     OUTPUT_VARIABLE
         SHORT_HASH)
 
-find_package(Libevent2 REQUIRED)
-include_directories(${LIBEVENT2_INCLUDE_DIR})
-
-find_package(OpenSSLx REQUIRED)
-include_directories(${OPENSSL_INCLUDE_DIR})
-
-find_package(jsonc REQUIRED)
-include_directories(${JSONC_INCLUDE_DIRS})
-
 add_executable(pegas ${SOURCES} ./3rd-party/tray/tray.h)
 
-target_link_libraries(pegas ${LIBEVENT2_LIBRARIES} ${LIBEVENT2_SSL_LIBRARIES} ${OPENSSL_LIBRARIES} ${JSONC_LIBRARIES} pthread)
+if (WIN32)
+  # vcpkg
+  find_package(Libevent CONFIG REQUIRED)
+  find_package(OpenSSL REQUIRED)
+  find_package(json-c CONFIG REQUIRED)
+  find_package(pthreads REQUIRED)
+
+  target_link_libraries(pegas PRIVATE libevent::core libevent::extra libevent::openssl OpenSSL::SSL OpenSSL::Crypto json-c::json-c pthreads)
+else()
+  find_package(jsonc REQUIRED)
+  include_directories(${JSONC_INCLUDE_DIRS})
+  find_package(OpenSSLx REQUIRED)
+  include_directories(${OPENSSL_INCLUDE_DIR})
+  find_package(Libevent2 REQUIRED)
+  include_directories(${LIBEVENT2_INCLUDE_DIR})
+  
+  target_link_libraries(pegas ${LIBEVENT2_LIBRARIES} ${LIBEVENT2_SSL_LIBRARIES} ${OPENSSL_LIBRARIES} ${JSONC_LIBRARIES} pthread)
+endif()
 
 if(DEFINED WITH_APPLET)
 if(UNIX AND NOT APPLE)

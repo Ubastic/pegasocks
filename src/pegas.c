@@ -1,14 +1,90 @@
-#include <arpa/inet.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <pthread.h>
 #include <signal.h>
+
+#include <pthread.h>
+
+#if defined(UNIX)
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/un.h>
 #include <netinet/in.h>
+#elif defined(WIN32)
+#include <winsock2.h>
+#define F_OK 0
+
+int opterr = 1, /* if error message should be printed */
+	optind = 1, /* index into parent argv vector */
+	optopt, /* character checked for validity */
+	optreset; /* reset getopt */
+char *optarg; /* argument associated with option */
+
+#define BADCH (int)'?'
+#define BADARG (int)':'
+#define EMSG ""
+
+/*
+* getopt --
+*      Parse argc/argv argument vector.
+*/
+int getopt(int nargc, char *const nargv[], const char *ostr)
+{
+	static char *place = EMSG; /* option letter processing */
+	const char *oli; /* option letter list index */
+
+	if (optreset || !*place) { /* update scanning pointer */
+		optreset = 0;
+		if (optind >= nargc || *(place = nargv[optind]) != '-') {
+			place = EMSG;
+			return (-1);
+		}
+		if (place[1] && *++place == '-') { /* found "--" */
+			++optind;
+			place = EMSG;
+			return (-1);
+		}
+	} /* option letter okay? */
+	if ((optopt = (int)*place++) == (int)':' ||
+	    !(oli = strchr(ostr, optopt))) {
+		/*
+      * if the user didn't specify '-' as an option,
+      * assume it means -1.
+      */
+		if (optopt == (int)'-')
+			return (-1);
+		if (!*place)
+			++optind;
+		if (opterr && *ostr != ':')
+			(void)printf("illegal option -- %c\n", optopt);
+		return (BADCH);
+	}
+	if (*++oli != ':') { /* don't need argument */
+		optarg = NULL;
+		if (!*place)
+			++optind;
+	} else { /* need an argument */
+		if (*place) /* no white space */
+			optarg = place;
+		else if (nargc <= ++optind) { /* no arg */
+			place = EMSG;
+			if (*ostr == ':')
+				return (BADARG);
+			if (opterr)
+				(void)printf(
+					"option requires an argument -- %c\n",
+					optopt);
+			return (BADCH);
+		} else /* white space */
+			optarg = nargv[optind];
+		place = EMSG;
+		++optind;
+	}
+	return (optopt); /* dump back option letter */
+}
+#endif
 
 #include "pgs_local_server.h"
 #include "pgs_config.h"
@@ -64,15 +140,28 @@ static int init_local_server_fd(const pgs_config_t *config, int *fd)
 	*fd = socket(AF_INET, SOCK_STREAM, 0);
 	int reuse_port = 1;
 
+#if defined(UNIX)
 	err = setsockopt(*fd, SOL_SOCKET, SO_REUSEPORT,
 			 (const void *)&reuse_port, sizeof(int));
+#elif defined(WIN32)
+	err = setsockopt(*fd, SOL_SOCKET, SO_REUSEADDR,
+			 (const void *)&reuse_port, sizeof(int));
+#endif
+
 	if (err < 0) {
 		perror("setsockopt");
 		return err;
 	}
 
+#if defined(UNIX)
 	int flag = fcntl(*fd, F_GETFL, 0);
 	fcntl(*fd, F_SETFL, flag | O_NONBLOCK);
+#elif defined(WIN32)
+	u_long mode = 1; // 1 to enable non-blocking socket
+	ioctlsocket(fd, FIONBIO, &mode);
+#endif
+
+	
 
 	err = bind(*fd, (struct sockaddr *)&sin, sizeof(sin));
 
@@ -106,14 +195,22 @@ static int init_control_fd(const pgs_config_t *config, int *fd)
 		sin.sin_port = htons(port);
 
 		*fd = socket(AF_INET, SOCK_STREAM, 0);
+
+#if defined(UNIX)
 		int flag = fcntl(*fd, F_GETFL, 0);
 		fcntl(*fd, F_SETFL, flag | O_NONBLOCK);
+#elif defined(WIN32)
+		u_long mode = 1; // 1 to enable non-blocking socket
+		ioctlsocket(fd, FIONBIO, &mode);
+#endif
+
 		err = bind(*fd, (struct sockaddr *)&sin, sizeof(sin));
 		if (err < 0) {
 			perror("bind");
 			return err;
 		}
 	} else if (config->control_file) {
+#if defined(UNIX)
 		// unix socket
 		struct sockaddr_un server;
 		*fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -128,6 +225,7 @@ static int init_control_fd(const pgs_config_t *config, int *fd)
 			perror("bind");
 			return err;
 		}
+#endif
 	}
 
 	return err;
@@ -135,12 +233,14 @@ static int init_control_fd(const pgs_config_t *config, int *fd)
 
 int main(int argc, char **argv)
 {
+#if defined(UNIX)
 	signal(SIGPIPE, SIG_IGN);
 
 	sigset_t set;
 	sigemptyset(&set);
 	sigaddset(&set, SIGPIPE);
 	pthread_sigmask(SIG_BLOCK, &set, NULL);
+#endif
 
 #ifdef DEBUG_EVENT
 	event_enable_debug_logging(EVENT_DBG_ALL);
@@ -218,12 +318,15 @@ int main(int argc, char **argv)
 
 	pgs_local_server_ctx_t ctx = { server_fd, mpsc, config, sm };
 
-	// TODO: init ctrl_fd
 	pgs_helper_thread_arg_t helper_thread_arg = { sm, logger, config,
 						      ctrl_fd };
 
 	// Spawn threads
+#if defined(UNIX)
 	pthread_t threads[server_threads + 1];
+#elif defined(WIN32)
+	pthread_t threads[4 + 1];
+#endif
 	pthread_attr_t attr;
 
 	pthread_attr_init(&attr);

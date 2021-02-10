@@ -1,7 +1,10 @@
 #ifndef _PGS_CORE
 #define _PGS_CORE
 
+#if defined(UNIX)
 #include <arpa/inet.h> // sockaddr type
+#endif
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <string.h> // memset

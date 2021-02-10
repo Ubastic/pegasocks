@@ -243,8 +243,13 @@ pgs_size_t pgs_vmess_write_head(const pgs_buf_t *uuid, pgs_vmess_ctx_t *ctx)
 	int p = 0;
 	pgs_size_t header_cmd_len =
 		1 + 16 + 16 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + n + p + 4;
+#if defined(UNIX)
 	pgs_buf_t header_cmd_raw[header_cmd_len];
 	pgs_buf_t header_cmd_encoded[header_cmd_len];
+#elif defined(WIN32)
+	pgs_buf_t *header_cmd_raw = malloc(header_cmd_len);
+	pgs_buf_t *header_cmd_encoded = malloc(header_cmd_len);
+#endif
 	memzero(header_cmd_raw, header_cmd_len);
 	memzero(header_cmd_encoded, header_cmd_len);
 
@@ -363,6 +368,10 @@ pgs_size_t pgs_vmess_write_head(const pgs_buf_t *uuid, pgs_vmess_ctx_t *ctx)
 			    header_cmd_encoded);
 	memcpy(buf + header_auth_len, header_cmd_encoded, header_cmd_len);
 
+#if defined(WIN32)
+	free(header_cmd_raw);
+	free(header_cmd_encoded);
+#endif
 	return header_auth_len + header_cmd_len;
 }
 
@@ -392,7 +401,7 @@ pgs_size_t pgs_vmess_write_body(const pgs_buf_t *data, pgs_size_t data_len,
 			localr[1] = (frame_data_len + 4);
 
 			unsigned int f =
-				fnv1a((void *)data + offset, frame_data_len);
+				fnv1a((void *)(data + offset), frame_data_len);
 			localr[2] = f >> 24;
 			localr[3] = f >> 16;
 			localr[4] = f >> 8;

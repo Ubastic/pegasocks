@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include <time.h>
 #include <pthread.h>
-#include <unistd.h>
 #include <stdarg.h>
+
+#if defined(UNIX)
+#include <unistd.h>
+#endif
 
 static char *log_levels[] = { "DEBUG", "INFO", "WARN", "ERROR" };
 static char *log_colors[] = { "\e[01;32m", "\e[01;32m", "\e[01;35m",
@@ -24,12 +27,13 @@ void pgs_logger_msg_free(pgs_logger_msg_t *lmsg)
 
 void pgs_logger_debug_buffer(pgs_logger_t *logger, unsigned char *buf, int size)
 {
-	char hexbuf[2 * size + 1];
+	char *hexbuf = malloc(2 * size + 1);
 	for (int i = 0; i < size; i++) {
 		sprintf(hexbuf + i * 2, "%02x", (int)buf[i]);
 	}
 	hexbuf[2 * size] = '\0';
 	pgs_logger_debug(logger, "%s", hexbuf);
+	free(hexbuf);
 }
 
 pgs_logger_t *pgs_logger_new(pgs_mpsc_t *mpsc, LOG_LEVEL level, bool isatty)
@@ -37,7 +41,9 @@ pgs_logger_t *pgs_logger_new(pgs_mpsc_t *mpsc, LOG_LEVEL level, bool isatty)
 	pgs_logger_t *ptr = malloc(sizeof(pgs_logger_t));
 	ptr->level = level;
 	ptr->mpsc = mpsc;
+#if defined(UNIX)
 	ptr->tid = (pgs_tid)pthread_self();
+#endif
 	ptr->isatty = isatty;
 	return ptr;
 }

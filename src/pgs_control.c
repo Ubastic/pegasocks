@@ -1,7 +1,10 @@
 #include "pgs_control.h"
 
 #include <ctype.h>
+
+#if defined(UNIX)
 #include <netinet/in.h>
+#endif
 
 #include <event2/listener.h>
 #include <event2/buffer.h>

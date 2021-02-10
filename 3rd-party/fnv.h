@@ -76,7 +76,15 @@
 #if !defined(__FNV_H__)
 #define __FNV_H__
 
+#if defined(UNIX)
 #include <sys/types.h>
+#elif defined(WIN32)
+#include <stdint.h>
+typedef uint8_t u_int8_t;
+typedef uint16_t u_int16_t;
+typedef uint32_t u_int32_t;
+typedef uint64_t u_int64_t;
+#endif
 
 #define FNV_VERSION "5.0.2"	/* @(#) FNV Version */
 

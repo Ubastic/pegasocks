@@ -49,7 +49,11 @@ void pgs_timer_init(int interval, pgs_timer_cb_t cb,
 pgs_helper_thread_ctx_t *pgs_helper_thread_ctx_new(pgs_helper_thread_arg_t *arg)
 {
 	pgs_helper_thread_ctx_t *ptr = malloc(sizeof(pgs_helper_thread_ctx_t));
+
+#if defined(UNIX)
 	ptr->tid = (pgs_tid)pthread_self();
+#endif
+
 	ptr->base = event_base_new();
 	ptr->config = arg->config;
 	ptr->logger = arg->logger;

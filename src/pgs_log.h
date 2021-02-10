@@ -5,7 +5,11 @@
 #include "stdio.h"
 
 typedef struct pgs_logger_s pgs_logger_t;
+#if defined(UNIX)
 typedef enum { DEBUG, INFO, WARN, ERROR } LOG_LEVEL;
+#elif defined(WIN32)
+typedef enum { DEBUG, INFO, WARN, _ERROR } LOG_LEVEL;
+#endif
 typedef struct pgs_logger_msg_s pgs_logger_msg_t;
 typedef struct pgs_logger_server_s pgs_logger_server_t;
 
@@ -18,7 +22,7 @@ typedef struct pgs_logger_server_s pgs_logger_server_t;
 #define pgs_logger_main_info(fp, ...) pgs_logger_main_log(INFO, fp, __VA_ARGS__)
 #define pgs_logger_main_bug(fp, ...) pgs_logger_main_log(DEBUG, fp, __VA_ARGS__)
 #define pgs_logger_main_error(fp, ...)                                         \
-	pgs_logger_main_log(ERROR, fp, __VA_ARGS__)
+	pgs_logger_main_log(_ERROR, fp, __VA_ARGS__)
 
 void pgs_logger_debug_buffer(pgs_logger_t *logger, unsigned char *buf,
 			     int size);

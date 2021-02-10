@@ -4,7 +4,12 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <pthread.h>
+
+#if defined(UNIX)
 #include <netinet/in.h>
+#elif defined(WIN32)
+#include <winsock2.h>
+#endif
 
 static void accept_error_cb(struct evconnlistener *listener, void *ctx)
 {
@@ -43,7 +48,11 @@ pgs_local_server_t *pgs_local_server_new(pgs_local_server_ctx_t *ctx)
 
 {
 	pgs_local_server_t *ptr = malloc(sizeof(pgs_local_server_t));
+
+#if defined(UNIX)
 	ptr->tid = (pgs_tid)pthread_self();
+#endif
+
 	ptr->logger = pgs_logger_new(ctx->mpsc, ctx->config->log_level,
 				     ctx->config->log_isatty);
 	ptr->base = event_base_new();
